@@ -39,6 +39,12 @@ Sets/reps/loading, rest, and a one-line intent note. Repeat "## Block N" for eac
 ## What changed and why
 - short bullet list: each removal/substitution/trim and the one-line reason.
 
+## Log this in the Pattern Tracker
+- one bullet per movement pattern actually trained in the ADAPTED session (ignore the warm-up), formatted exactly as "<Pattern> · <Load>"
+- Pattern must be exactly one of: Push, Pull, Hinge, Squat, Carry, Olympic — pick every pattern that applies (a session can hit more than one)
+- Load must be exactly one of: Light, Moderate, Heavy, judged by the adapted session's actual prescribed effort (e.g. submaximal barbell work capped per rule 6 is usually Moderate, not Heavy; technique-focused Olympic lifts are Light, not Heavy)
+- Do not include a pattern that doesn't appear in the adapted work blocks
+
 Keep the tone plain and practical. No preamble before the first heading, nothing after the last section.`;
 
 const server = http.createServer(async (req, res) => {
