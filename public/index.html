@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strength Companion</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Strength Companion</h1>
+    <nav>
+      <button id="tab-adapter" class="tab active" data-view="adapter">Session Adapter</button>
+      <button id="tab-tracker" class="tab" data-view="tracker">Pattern Tracker</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Session Adapter -->
+    <section id="view-adapter" class="view">
+      <p class="hint">Paste a raw CrossFit WOD below. It will be adapted to a 60-minute session
+        (12-min warm-up, trimmed volume, no heavy Olympic progressions, no good mornings, no post-WOD zone 1 cardio).</p>
+      <textarea id="wod-input" rows="12" placeholder="Paste WOD here…"></textarea>
+      <div class="row">
+        <button id="adapt-btn" class="primary">Adapt to 60 min</button>
+        <span id="adapt-status" class="status" hidden>Adapting…</span>
+      </div>
+      <div id="adapt-error" class="error" hidden></div>
+      <article id="adapt-result" hidden></article>
+    </section>
+
+    <!-- Pattern Tracker -->
+    <section id="view-tracker" class="view" hidden>
+      <div id="heavy-warnings"></div>
+
+      <form id="log-form">
+        <h2>Log a session</h2>
+        <div class="row">
+          <label>Date <input type="date" id="log-date" required /></label>
+          <label class="grow">Title <input type="text" id="log-title" placeholder="e.g. Adapted Linchpin Tuesday" required /></label>
+        </div>
+        <fieldset>
+          <legend>Movement patterns &amp; load</legend>
+          <div id="pattern-grid"></div>
+        </fieldset>
+        <button type="submit" class="primary">Save session</button>
+      </form>
+
+      <div class="chart-header">
+        <h2>Pattern frequency</h2>
+        <div class="toggle">
+          <button id="range-7" class="range active">7 days</button>
+          <button id="range-28" class="range">28 days</button>
+        </div>
+      </div>
+      <div id="chart"></div>
+
+      <h2>Session history</h2>
+      <ul id="session-list"></ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

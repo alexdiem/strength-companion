@@ -1,0 +1,293 @@
+const PATTERNS = ["Push", "Pull", "Hinge", "Squat", "Carry", "Olympic"];
+const LOADS = ["Light", "Moderate", "Heavy"];
+const STORAGE_KEY = "strength-companion-sessions";
+
+// ---------- storage ----------
+
+function loadSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessions(sessions) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+}
+
+// ---------- tabs ----------
+
+const views = { adapter: document.getElementById("view-adapter"), tracker: document.getElementById("view-tracker") };
+document.querySelectorAll(".tab").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
+    Object.entries(views).forEach(([name, el]) => (el.hidden = name !== btn.dataset.view));
+  });
+});
+
+// ---------- session adapter ----------
+
+const adaptBtn = document.getElementById("adapt-btn");
+const wodInput = document.getElementById("wod-input");
+const adaptStatus = document.getElementById("adapt-status");
+const adaptError = document.getElementById("adapt-error");
+const adaptResult = document.getElementById("adapt-result");
+
+adaptBtn.addEventListener("click", async () => {
+  const wod = wodInput.value.trim();
+  adaptError.hidden = true;
+  adaptResult.hidden = true;
+  if (!wod) {
+    adaptError.textContent = "Paste a workout first.";
+    adaptError.hidden = false;
+    return;
+  }
+  adaptBtn.disabled = true;
+  adaptStatus.hidden = false;
+  try {
+    const res = await fetch("/api/adapt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wod }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    adaptResult.innerHTML = renderMarkdown(data.adapted);
+    adaptResult.hidden = false;
+  } catch (err) {
+    adaptError.textContent = err.message;
+    adaptError.hidden = false;
+  } finally {
+    adaptBtn.disabled = false;
+    adaptStatus.hidden = true;
+  }
+});
+
+// minimal markdown renderer for the known output shape (## headings, - bullets, **bold**)
+function renderMarkdown(md) {
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const lines = md.split(/\r?\n/);
+  let html = "";
+  let inList = false;
+  for (const line of lines) {
+    if (/^##\s+/.test(line)) {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<h2>${inline(line.replace(/^##\s+/, ""))}</h2>`;
+    } else if (/^[-*]\s+/.test(line)) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${inline(line.replace(/^[-*]\s+/, ""))}</li>`;
+    } else if (line.trim() === "") {
+      if (inList) { html += "</ul>"; inList = false; }
+    } else {
+      if (inList) { html += "</ul>"; inList = false; }
+      html += `<p>${inline(line)}</p>`;
+    }
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
+
+// ---------- tracker: log form ----------
+
+const patternGrid = document.getElementById("pattern-grid");
+PATTERNS.forEach((pattern) => {
+  const name = document.createElement("div");
+  name.className = "pattern-name";
+  name.textContent = pattern;
+  const options = document.createElement("div");
+  options.className = "load-options";
+  ["None", ...LOADS].forEach((load) => {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = `load-${pattern}`;
+    input.value = load;
+    input.checked = load === "None";
+    label.append(input, load);
+    options.append(label);
+  });
+  patternGrid.append(name, options);
+});
+
+const logForm = document.getElementById("log-form");
+const logDate = document.getElementById("log-date");
+const logTitle = document.getElementById("log-title");
+logDate.value = new Date().toISOString().slice(0, 10);
+
+logForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const patterns = PATTERNS.map((p) => ({
+    pattern: p,
+    load: logForm.querySelector(`input[name="load-${p}"]:checked`).value,
+  })).filter((x) => x.load !== "None");
+  if (patterns.length === 0) {
+    alert("Tag at least one movement pattern.");
+    return;
+  }
+  const sessions = loadSessions();
+  sessions.push({
+    id: Date.now().toString(36),
+    date: logDate.value,
+    title: logTitle.value.trim(),
+    patterns,
+  });
+  saveSessions(sessions);
+  logForm.reset();
+  logDate.value = new Date().toISOString().slice(0, 10);
+  render();
+});
+
+// ---------- tracker: views ----------
+
+let rangeDays = 7;
+document.getElementById("range-7").addEventListener("click", () => setRange(7));
+document.getElementById("range-28").addEventListener("click", () => setRange(28));
+
+function setRange(days) {
+  rangeDays = days;
+  document.getElementById("range-7").classList.toggle("active", days === 7);
+  document.getElementById("range-28").classList.toggle("active", days === 28);
+  render();
+}
+
+function sessionsInLastDays(sessions, days) {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  return sessions.filter((s) => new Date(s.date + "T00:00:00") >= cutoff);
+}
+
+function render() {
+  const sessions = loadSessions().sort((a, b) => b.date.localeCompare(a.date));
+  renderWarnings(sessions);
+  renderChart(sessions);
+  renderList(sessions);
+}
+
+function renderWarnings(sessions) {
+  const container = document.getElementById("heavy-warnings");
+  container.innerHTML = "";
+  const recent = sessionsInLastDays(sessions, 7);
+  const heavyCounts = {};
+  for (const s of recent) {
+    for (const { pattern, load } of s.patterns) {
+      if (load === "Heavy") heavyCounts[pattern] = (heavyCounts[pattern] || 0) + 1;
+    }
+  }
+  for (const [pattern, count] of Object.entries(heavyCounts)) {
+    if (count > 2) {
+      const div = document.createElement("div");
+      div.className = "warning";
+      div.textContent = `⚠ ${pattern} trained Heavy ${count}× in the last 7 days — consider backing off.`;
+      container.append(div);
+    }
+  }
+}
+
+function renderChart(sessions) {
+  const chart = document.getElementById("chart");
+  chart.innerHTML = "";
+  const recent = sessionsInLastDays(sessions, rangeDays);
+
+  // counts[pattern][load]
+  const counts = {};
+  PATTERNS.forEach((p) => (counts[p] = { Light: 0, Moderate: 0, Heavy: 0 }));
+  for (const s of recent) {
+    for (const { pattern, load } of s.patterns) {
+      if (counts[pattern]) counts[pattern][load]++;
+    }
+  }
+  const max = Math.max(1, ...PATTERNS.map((p) => LOADS.reduce((sum, l) => sum + counts[p][l], 0)));
+
+  for (const pattern of PATTERNS) {
+    const total = LOADS.reduce((sum, l) => sum + counts[pattern][l], 0);
+    const row = document.createElement("div");
+    row.className = "bar-row";
+
+    const name = document.createElement("div");
+    name.textContent = pattern;
+
+    const track = document.createElement("div");
+    track.className = "bar-track";
+    const bar = document.createElement("div");
+    bar.className = "bar";
+    bar.style.width = `${(total / max) * 100}%`;
+    for (const load of LOADS) {
+      if (counts[pattern][load] === 0) continue;
+      const seg = document.createElement("div");
+      seg.className = `bar-seg ${load.toLowerCase()}`;
+      seg.style.flex = counts[pattern][load];
+      seg.title = `${load}: ${counts[pattern][load]}`;
+      bar.append(seg);
+    }
+    track.append(bar);
+
+    const count = document.createElement("div");
+    count.className = "bar-count";
+    count.textContent = total;
+
+    row.append(name, track, count);
+    chart.append(row);
+  }
+
+  const legend = document.createElement("div");
+  legend.className = "chart-legend";
+  legend.innerHTML = `<span class="light">Light</span><span class="moderate">Moderate</span><span class="heavy">Heavy</span>`;
+  chart.append(legend);
+
+  if (recent.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = `No sessions in the last ${rangeDays} days.`;
+    chart.prepend(empty);
+  }
+}
+
+function renderList(sessions) {
+  const list = document.getElementById("session-list");
+  list.innerHTML = "";
+  if (sessions.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "No sessions logged yet.";
+    list.append(li);
+    return;
+  }
+  for (const s of sessions) {
+    const li = document.createElement("li");
+
+    const meta = document.createElement("div");
+    meta.className = "session-meta";
+    const title = document.createElement("div");
+    title.textContent = s.title;
+    const date = document.createElement("div");
+    date.className = "session-date";
+    date.textContent = s.date;
+    meta.append(title, date);
+
+    const tags = document.createElement("div");
+    tags.className = "session-tags";
+    for (const { pattern, load } of s.patterns) {
+      const tag = document.createElement("span");
+      tag.className = `tag ${load.toLowerCase()}`;
+      tag.textContent = `${pattern} · ${load}`;
+      tags.append(tag);
+    }
+
+    const del = document.createElement("button");
+    del.className = "delete-btn";
+    del.title = "Delete session";
+    del.textContent = "✕";
+    del.addEventListener("click", () => {
+      saveSessions(loadSessions().filter((x) => x.id !== s.id));
+      render();
+    });
+
+    li.append(meta, tags, del);
+    list.append(li);
+  }
+}
+
+render();

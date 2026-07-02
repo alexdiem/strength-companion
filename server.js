@@ -1,0 +1,109 @@
+import Anthropic from "@anthropic-ai/sdk";
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(__dirname, "public");
+const PORT = process.env.PORT || 3000;
+
+const client = new Anthropic();
+
+const SYSTEM_PROMPT = `You are a strength training coach who adapts CrossFit WODs (from sites like Kriger Training or Linchpin) into 60-minute sessions for an athlete who also does separate endurance training.
+
+Adaptation rules — apply all of them, every time:
+1. Total session = exactly 60 minutes, including a 12-minute warm-up. Budget the remaining 48 minutes across the work blocks.
+2. Trim sets and rest periods proportionally so the original session's intent fits the time budget.
+3. Flag and REMOVE any high-load Olympic lifting progressions: building snatch or clean complexes with increasing load, multiple heavy sets of snatch/clean/jerk. If an Olympic lift appears in a conditioning piece, keep it only at a light, technique-focused load.
+4. NEVER include good mornings under any circumstances. If the original has them, substitute a safe hinge alternative (e.g. Romanian deadlift at moderate load, back extensions) and say why.
+5. Remove any post-WOD zone 1 / low-intensity cardio (30-60 min bike, row, run, etc.) — the athlete gets this from separate endurance training.
+6. Cap barbell complexity: keep technical barbell lifts at controlled, submaximal loads (roughly 60-75% effort), never grinding maximal singles or complexes.
+7. Metric units only: kg, metres, calories. Convert any lbs loads to sensible rounded kg.
+
+Output format (use exactly these markdown sections):
+## Warm-up (12 min)
+- bullet list of warm-up items with rough minutes
+
+## Block 1: <name> (~X min)
+Sets/reps/loading, rest, and a one-line intent note. Repeat "## Block N" for each block. Time estimates must sum to 48 minutes.
+
+## What changed and why
+- short bullet list: each removal/substitution/trim and the one-line reason.
+
+Keep the tone plain and practical. No preamble before the first heading, nothing after the last section.`;
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === "POST" && req.url === "/api/adapt") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", async () => {
+      try {
+        const { wod } = JSON.parse(body || "{}");
+        if (!wod || !wod.trim()) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "No workout text provided." }));
+          return;
+        }
+        const stream = client.messages.stream({
+          model: "claude-opus-4-8",
+          max_tokens: 4096,
+          thinking: { type: "adaptive" },
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: `Adapt this WOD to a 60-minute session following your rules:\n\n${wod}`,
+            },
+          ],
+        });
+        const message = await stream.finalMessage();
+        const text = message.content
+          .filter((b) => b.type === "text")
+          .map((b) => b.text)
+          .join("\n");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ adapted: text }));
+      } catch (err) {
+        const missingKey =
+          err instanceof Anthropic.AuthenticationError ||
+          /apiKey|api key|authentication/i.test(String(err.message));
+        res.writeHead(missingKey ? 401 : 500, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: missingKey
+              ? "Anthropic API key missing or invalid. Set the ANTHROPIC_API_KEY environment variable and restart the server."
+              : `Adaptation failed: ${err.message}`,
+          })
+        );
+      }
+    });
+    return;
+  }
+
+  // static files
+  const urlPath = req.url === "/" ? "/index.html" : req.url.split("?")[0];
+  const filePath = path.join(PUBLIC_DIR, path.normalize(urlPath));
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    res.writeHead(403);
+    res.end();
+    return;
+  }
+  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": types[path.extname(filePath)] || "application/octet-stream" });
+    res.end(data);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`Strength Companion running at http://localhost:${PORT}`);
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn("Warning: ANTHROPIC_API_KEY is not set — the session adapter will not work until it is.");
+  }
+});
