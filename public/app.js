@@ -33,11 +33,18 @@ const wodInput = document.getElementById("wod-input");
 const adaptStatus = document.getElementById("adapt-status");
 const adaptError = document.getElementById("adapt-error");
 const adaptResult = document.getElementById("adapt-result");
+const logSessionRow = document.getElementById("log-session-row");
+const logSessionBtn = document.getElementById("log-session-btn");
+const logSessionStatus = document.getElementById("log-session-status");
+
+let lastAdaptedMarkdown = null;
 
 adaptBtn.addEventListener("click", async () => {
   const wod = wodInput.value.trim();
   adaptError.hidden = true;
   adaptResult.hidden = true;
+  logSessionRow.hidden = true;
+  lastAdaptedMarkdown = null;
   if (!wod) {
     adaptError.textContent = "Paste a workout first.";
     adaptError.hidden = false;
@@ -55,6 +62,9 @@ adaptBtn.addEventListener("click", async () => {
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
     adaptResult.innerHTML = renderMarkdown(data.adapted);
     adaptResult.hidden = false;
+    lastAdaptedMarkdown = data.adapted;
+    resetLogSessionButton();
+    logSessionRow.hidden = false;
   } catch (err) {
     adaptError.textContent = err.message;
     adaptError.hidden = false;
@@ -63,6 +73,65 @@ adaptBtn.addEventListener("click", async () => {
     adaptStatus.hidden = true;
   }
 });
+
+function resetLogSessionButton() {
+  logSessionBtn.disabled = false;
+  logSessionBtn.textContent = "Log this session";
+  logSessionStatus.hidden = true;
+}
+
+logSessionBtn.addEventListener("click", () => {
+  const patterns = parseLoggedPatterns(lastAdaptedMarkdown);
+  if (patterns.length === 0) {
+    logSessionStatus.textContent = "Couldn't find pattern tags in the response — log it manually in the Pattern Tracker tab.";
+    logSessionStatus.hidden = false;
+    return;
+  }
+  const sessions = loadSessions();
+  sessions.push({
+    id: Date.now().toString(36),
+    date: new Date().toISOString().slice(0, 10),
+    title: parseSessionTitle(lastAdaptedMarkdown),
+    patterns,
+  });
+  saveSessions(sessions);
+  render();
+  logSessionBtn.disabled = true;
+  logSessionBtn.textContent = "Logged ✓";
+  logSessionStatus.textContent = patterns.map(({ pattern, load }) => `${pattern} · ${load}`).join(", ");
+  logSessionStatus.hidden = false;
+});
+
+// pull the "<Pattern> · <Load>" bullets out of the "## Log this in the Pattern Tracker" section
+function parseLoggedPatterns(markdown) {
+  if (!markdown) return [];
+  const lines = markdown.split(/\r?\n/);
+  const startIdx = lines.findIndex((l) => /^##\s*Log this in the Pattern Tracker/i.test(l.trim()));
+  if (startIdx === -1) return [];
+  const patterns = [];
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^##\s+/.test(line)) break;
+    const m = line.match(/^[-*]\s*([A-Za-z]+)\s*[·:\-–—]\s*([A-Za-z]+)/);
+    if (!m) continue;
+    const pattern = PATTERNS.find((p) => p.toLowerCase() === m[1].toLowerCase());
+    const load = LOADS.find((l) => l.toLowerCase() === m[2].toLowerCase());
+    if (pattern && load) patterns.push({ pattern, load });
+  }
+  return patterns;
+}
+
+// build a readable title from the block headings, e.g. "Back Squat + Conditioning"
+function parseSessionTitle(markdown) {
+  if (!markdown) return "Adapted session";
+  const names = [];
+  const re = /^##\s*Block\s*\d+:\s*(.+?)\s*\(.*?\)\s*$/gim;
+  let m;
+  while ((m = re.exec(markdown))) {
+    names.push(m[1].trim());
+  }
+  return names.length ? `Adapted: ${names.join(" + ")}` : "Adapted session";
+}
 
 // minimal markdown renderer for the known output shape (## headings, - bullets, **bold**)
 function renderMarkdown(md) {
