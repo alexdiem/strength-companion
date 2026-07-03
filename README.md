@@ -19,10 +19,12 @@ Every adapted session follows these rules:
 
 ## Tracker
 
-- Sessions are saved in the browser (localStorage) — no login, no account.
+- Sessions are saved server-side to `data/sessions.json` — no login, no account, no database. This file is git-ignored, so your logged sessions never get committed.
+- Persists across app restarts and across browsers, since it's a file on disk rather than browser storage.
 - Each session: date, title, and pattern tags with load.
 - Bar chart shows pattern distribution over the last 7 or 28 days, stacked by load.
 - A warning appears if any pattern is trained at Heavy load more than twice in 7 days.
+- Sessions previously saved in browser localStorage (an earlier version of the app) are migrated automatically to `data/sessions.json` on first load.
 
 ## Setup
 

@@ -3,12 +3,59 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
+const DATA_DIR = path.join(__dirname, "data");
+const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
 const PORT = process.env.PORT || 3000;
 
+const PATTERNS = ["Push", "Pull", "Hinge", "Squat", "Carry", "Olympic"];
+const LOADS = ["Light", "Moderate", "Heavy"];
+
 const client = new Anthropic();
+
+// ---------- session storage (JSON file on disk — durable across restarts, single-user) ----------
+
+async function readSessions() {
+  try {
+    const raw = await fs.promises.readFile(SESSIONS_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    if (err.code === "ENOENT") return [];
+    console.error("Failed to read sessions.json, treating as empty:", err.message);
+    return [];
+  }
+}
+
+async function writeSessions(sessions) {
+  await fs.promises.mkdir(DATA_DIR, { recursive: true });
+  await fs.promises.writeFile(SESSIONS_FILE, JSON.stringify(sessions, null, 2), "utf8");
+}
+
+function isValidSessionInput(body) {
+  if (!body || typeof body !== "object") return false;
+  if (typeof body.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(body.date)) return false;
+  if (typeof body.title !== "string" || !body.title.trim()) return false;
+  if (!Array.isArray(body.patterns) || body.patterns.length === 0) return false;
+  return body.patterns.every((p) => p && PATTERNS.includes(p.pattern) && LOADS.includes(p.load));
+}
+
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => resolve(body));
+    req.on("error", reject);
+  });
+}
+
+function sendJson(res, status, body) {
+  res.writeHead(status, { "Content-Type": "application/json" });
+  res.end(JSON.stringify(body));
+}
 
 const SYSTEM_PROMPT = `You are a strength training coach who adapts CrossFit WODs (from sites like Kriger Training or Linchpin) into 60-minute sessions for an athlete who also does separate endurance training.
 
@@ -47,51 +94,115 @@ Sets/reps/loading, rest, and a one-line intent note. Repeat "## Block N" for eac
 
 Keep the tone plain and practical. No preamble before the first heading, nothing after the last section.`;
 
-const server = http.createServer(async (req, res) => {
-  if (req.method === "POST" && req.url === "/api/adapt") {
-    let body = "";
-    req.on("data", (chunk) => (body += chunk));
-    req.on("end", async () => {
-      try {
-        const { wod } = JSON.parse(body || "{}");
-        if (!wod || !wod.trim()) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "No workout text provided." }));
-          return;
-        }
-        const stream = client.messages.stream({
-          model: "claude-opus-4-8",
-          max_tokens: 4096,
-          thinking: { type: "adaptive" },
-          system: SYSTEM_PROMPT,
-          messages: [
-            {
-              role: "user",
-              content: `Adapt this WOD to a 60-minute session following your rules:\n\n${wod}`,
-            },
-          ],
-        });
-        const message = await stream.finalMessage();
-        const text = message.content
-          .filter((b) => b.type === "text")
-          .map((b) => b.text)
-          .join("\n");
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ adapted: text }));
-      } catch (err) {
-        const missingKey =
-          err instanceof Anthropic.AuthenticationError ||
-          /apiKey|api key|authentication/i.test(String(err.message));
-        res.writeHead(missingKey ? 401 : 500, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            error: missingKey
-              ? "Anthropic API key missing or invalid. Set the ANTHROPIC_API_KEY environment variable and restart the server."
-              : `Adaptation failed: ${err.message}`,
-          })
-        );
-      }
+async function handleAdapt(req, res) {
+  const rawBody = await readRequestBody(req);
+  let wod;
+  try {
+    ({ wod } = JSON.parse(rawBody || "{}"));
+  } catch {
+    sendJson(res, 400, { error: "Invalid JSON body." });
+    return;
+  }
+  if (!wod || !wod.trim()) {
+    sendJson(res, 400, { error: "No workout text provided." });
+    return;
+  }
+  try {
+    const stream = client.messages.stream({
+      model: "claude-opus-4-8",
+      max_tokens: 4096,
+      thinking: { type: "adaptive" },
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: `Adapt this WOD to a 60-minute session following your rules:\n\n${wod}`,
+        },
+      ],
     });
+    const message = await stream.finalMessage();
+    const text = message.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+    sendJson(res, 200, { adapted: text });
+  } catch (err) {
+    const missingKey =
+      err instanceof Anthropic.AuthenticationError ||
+      /apiKey|api key|authentication/i.test(String(err.message));
+    sendJson(res, missingKey ? 401 : 500, {
+      error: missingKey
+        ? "Anthropic API key missing or invalid. Set the ANTHROPIC_API_KEY environment variable and restart the server."
+        : `Adaptation failed: ${err.message}`,
+    });
+  }
+}
+
+async function handleListSessions(req, res) {
+  const sessions = await readSessions();
+  sendJson(res, 200, sessions);
+}
+
+async function handleCreateSession(req, res) {
+  const rawBody = await readRequestBody(req);
+  let input;
+  try {
+    input = JSON.parse(rawBody || "{}");
+  } catch {
+    sendJson(res, 400, { error: "Invalid JSON body." });
+    return;
+  }
+  if (!isValidSessionInput(input)) {
+    sendJson(res, 400, {
+      error: "Session must include date (YYYY-MM-DD), title, and at least one valid pattern/load tag.",
+    });
+    return;
+  }
+  const session = {
+    id: randomUUID(),
+    date: input.date,
+    title: input.title.trim(),
+    patterns: input.patterns.map(({ pattern, load }) => ({ pattern, load })),
+  };
+  const sessions = await readSessions();
+  sessions.push(session);
+  await writeSessions(sessions);
+  sendJson(res, 201, session);
+}
+
+async function handleDeleteSession(req, res, id) {
+  const sessions = await readSessions();
+  const next = sessions.filter((s) => s.id !== id);
+  if (next.length === sessions.length) {
+    sendJson(res, 404, { error: "Session not found." });
+    return;
+  }
+  await writeSessions(next);
+  res.writeHead(204);
+  res.end();
+}
+
+const server = http.createServer(async (req, res) => {
+  try {
+    if (req.method === "POST" && req.url === "/api/adapt") {
+      await handleAdapt(req, res);
+      return;
+    }
+    if (req.method === "GET" && req.url === "/api/sessions") {
+      await handleListSessions(req, res);
+      return;
+    }
+    if (req.method === "POST" && req.url === "/api/sessions") {
+      await handleCreateSession(req, res);
+      return;
+    }
+    const deleteMatch = req.method === "DELETE" && req.url.match(/^\/api\/sessions\/([^/]+)$/);
+    if (deleteMatch) {
+      await handleDeleteSession(req, res, decodeURIComponent(deleteMatch[1]));
+      return;
+    }
+  } catch (err) {
+    sendJson(res, 500, { error: `Server error: ${err.message}` });
     return;
   }
 

@@ -1,19 +1,60 @@
 const PATTERNS = ["Push", "Pull", "Hinge", "Squat", "Carry", "Olympic"];
 const LOADS = ["Light", "Moderate", "Heavy"];
-const STORAGE_KEY = "strength-companion-sessions";
+const LEGACY_STORAGE_KEY = "strength-companion-sessions"; // old browser-local storage, pre server-side persistence
 
-// ---------- storage ----------
+// ---------- storage (server-side JSON file — persists across restarts and browsers) ----------
 
-function loadSessions() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch {
-    return [];
-  }
+async function fetchSessions() {
+  const res = await fetch("/api/sessions");
+  if (!res.ok) throw new Error(`Server returned ${res.status}`);
+  return res.json();
 }
 
-function saveSessions(sessions) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+async function createSession(session) {
+  const res = await fetch("/api/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(session),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Server returned ${res.status}`);
+  }
+  return res.json();
+}
+
+async function deleteSession(id) {
+  const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok && res.status !== 404) throw new Error(`Server returned ${res.status}`);
+}
+
+// one-time migration: move any sessions logged before server-side storage existed
+async function migrateLegacyLocalStorage() {
+  let legacy;
+  try {
+    legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY) || "[]");
+  } catch {
+    legacy = [];
+  }
+  if (!Array.isArray(legacy) || legacy.length === 0) return;
+  for (const s of legacy) {
+    if (!s || !Array.isArray(s.patterns) || s.patterns.length === 0) continue;
+    try {
+      await createSession({ date: s.date, title: s.title, patterns: s.patterns });
+    } catch {
+      return; // leave localStorage intact; retry next load rather than lose data
+    }
+  }
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+const trackerError = document.getElementById("tracker-error");
+function showTrackerError(message) {
+  trackerError.textContent = message;
+  trackerError.hidden = false;
+}
+function hideTrackerError() {
+  trackerError.hidden = true;
 }
 
 // ---------- tabs ----------
@@ -80,23 +121,27 @@ function resetLogSessionButton() {
   logSessionStatus.hidden = true;
 }
 
-logSessionBtn.addEventListener("click", () => {
+logSessionBtn.addEventListener("click", async () => {
   const patterns = parseLoggedPatterns(lastAdaptedMarkdown);
   if (patterns.length === 0) {
     logSessionStatus.textContent = "Couldn't find pattern tags in the response — log it manually in the Pattern Tracker tab.";
     logSessionStatus.hidden = false;
     return;
   }
-  const sessions = loadSessions();
-  sessions.push({
-    id: Date.now().toString(36),
-    date: new Date().toISOString().slice(0, 10),
-    title: parseSessionTitle(lastAdaptedMarkdown),
-    patterns,
-  });
-  saveSessions(sessions);
-  render();
   logSessionBtn.disabled = true;
+  try {
+    await createSession({
+      date: new Date().toISOString().slice(0, 10),
+      title: parseSessionTitle(lastAdaptedMarkdown),
+      patterns,
+    });
+  } catch (err) {
+    logSessionBtn.disabled = false;
+    logSessionStatus.textContent = `Couldn't log session: ${err.message}`;
+    logSessionStatus.hidden = false;
+    return;
+  }
+  render();
   logSessionBtn.textContent = "Logged ✓";
   logSessionStatus.textContent = patterns.map(({ pattern, load }) => `${pattern} · ${load}`).join(", ");
   logSessionStatus.hidden = false;
@@ -185,7 +230,7 @@ const logDate = document.getElementById("log-date");
 const logTitle = document.getElementById("log-title");
 logDate.value = new Date().toISOString().slice(0, 10);
 
-logForm.addEventListener("submit", (e) => {
+logForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const patterns = PATTERNS.map((p) => ({
     pattern: p,
@@ -195,14 +240,12 @@ logForm.addEventListener("submit", (e) => {
     alert("Tag at least one movement pattern.");
     return;
   }
-  const sessions = loadSessions();
-  sessions.push({
-    id: Date.now().toString(36),
-    date: logDate.value,
-    title: logTitle.value.trim(),
-    patterns,
-  });
-  saveSessions(sessions);
+  try {
+    await createSession({ date: logDate.value, title: logTitle.value.trim(), patterns });
+  } catch (err) {
+    showTrackerError(`Couldn't save session: ${err.message}`);
+    return;
+  }
   logForm.reset();
   logDate.value = new Date().toISOString().slice(0, 10);
   render();
@@ -228,8 +271,16 @@ function sessionsInLastDays(sessions, days) {
   return sessions.filter((s) => new Date(s.date + "T00:00:00") >= cutoff);
 }
 
-function render() {
-  const sessions = loadSessions().sort((a, b) => b.date.localeCompare(a.date));
+async function render() {
+  let sessions;
+  try {
+    sessions = await fetchSessions();
+  } catch (err) {
+    showTrackerError(`Couldn't load sessions from the server: ${err.message}`);
+    return;
+  }
+  hideTrackerError();
+  sessions.sort((a, b) => b.date.localeCompare(a.date));
   renderWarnings(sessions);
   renderChart(sessions);
   renderList(sessions);
@@ -349,8 +400,15 @@ function renderList(sessions) {
     del.className = "delete-btn";
     del.title = "Delete session";
     del.textContent = "✕";
-    del.addEventListener("click", () => {
-      saveSessions(loadSessions().filter((x) => x.id !== s.id));
+    del.addEventListener("click", async () => {
+      del.disabled = true;
+      try {
+        await deleteSession(s.id);
+      } catch (err) {
+        showTrackerError(`Couldn't delete session: ${err.message}`);
+        del.disabled = false;
+        return;
+      }
       render();
     });
 
@@ -359,4 +417,4 @@ function renderList(sessions) {
   }
 }
 
-render();
+migrateLegacyLocalStorage().finally(render);
