@@ -19,8 +19,8 @@ Every adapted session follows these rules:
 
 ## Tracker
 
-- Sessions are saved server-side to `data/sessions.json` — no login, no account, no database. This file is git-ignored, so your logged sessions never get committed.
-- Persists across app restarts and across browsers, since it's a file on disk rather than browser storage.
+- Sessions are saved server-side — locally to `data/sessions.json` (git-ignored), on Vercel to Upstash Redis. No login, no account.
+- Persists across app restarts and across browsers, since it's stored server-side rather than in the browser.
 - Each session: date, title, and pattern tags with load.
 - Bar chart shows pattern distribution over the last 7 or 28 days, stacked by load.
 - A warning appears if any pattern is trained at Heavy load more than twice in 7 days.
@@ -46,3 +46,14 @@ To set the key permanently (so you don't have to set it each time):
 ```
 
 The tracker works without an API key; only the adapter needs one.
+
+## Deploying to Vercel
+
+The repo is Vercel-ready: `public/` is served as static files, and the routes under `api/` run as serverless functions (`vercel.json` raises the adapt function's `maxDuration` to 60s for the Claude call). Setup in the Vercel dashboard:
+
+1. **Import the GitHub repo** as a new project (no framework preset / build step needed).
+2. **Storage** — add the **Upstash for Redis** integration to the project (Storage tab). The filesystem on Vercel is ephemeral, so the tracker refuses to run there without Redis; the integration's env vars (`UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN` or `KV_REST_API_URL`/`KV_REST_API_TOKEN`) are picked up automatically.
+3. **Environment variable** — add `ANTHROPIC_API_KEY` (Settings → Environment Variables).
+4. **Access protection** — enable Deployment Protection → **Vercel Authentication** (Settings → Deployment Protection) so only you can open the app. Without this, anyone with the URL can use your Anthropic API key.
+
+Local dev is unchanged: `npm start` runs `server.js` with the JSON-file backend — no Redis needed. Note the two backends are separate stores: sessions logged locally stay local and vice versa.
