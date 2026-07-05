@@ -12,6 +12,7 @@ import {
   buildSession,
   SESSION_INPUT_ERROR,
 } from "./lib/storage.js";
+import { verifyPassword, createSessionToken, buildSessionCookie, isAuthenticated } from "./lib/auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -38,6 +39,32 @@ async function parseJsonBody(req, res) {
     sendJson(res, 400, { error: "Invalid JSON body." });
     return null;
   }
+}
+
+async function handleLogin(req, res) {
+  const input = await parseJsonBody(req, res);
+  if (input === null) return;
+  const expected = process.env.APP_PASSWORD;
+  const secret = process.env.SESSION_SECRET;
+  if (!expected || !secret) {
+    sendJson(res, 500, { error: "Server is not configured with APP_PASSWORD / SESSION_SECRET." });
+    return;
+  }
+  if (!verifyPassword(input.password, expected)) {
+    sendJson(res, 401, { error: "Incorrect password." });
+    return;
+  }
+  const token = createSessionToken(secret);
+  res.setHeader("Set-Cookie", buildSessionCookie(token, { secure: false }));
+  sendJson(res, 200, { ok: true });
+}
+
+function requireAuth(req, res) {
+  if (!isAuthenticated(req, process.env.SESSION_SECRET)) {
+    sendJson(res, 401, { error: "Not authenticated" });
+    return false;
+  }
+  return true;
 }
 
 async function handleAdapt(req, res) {
@@ -87,20 +114,28 @@ async function handleDeleteSession(req, res, id) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if (req.method === "POST" && req.url === "/api/login") {
+      await handleLogin(req, res);
+      return;
+    }
     if (req.method === "POST" && req.url === "/api/adapt") {
+      if (!requireAuth(req, res)) return;
       await handleAdapt(req, res);
       return;
     }
     if (req.method === "GET" && req.url === "/api/sessions") {
+      if (!requireAuth(req, res)) return;
       sendJson(res, 200, await readSessions());
       return;
     }
     if (req.method === "POST" && req.url === "/api/sessions") {
+      if (!requireAuth(req, res)) return;
       await handleCreateSession(req, res);
       return;
     }
     const deleteMatch = req.method === "DELETE" && req.url.match(/^\/api\/sessions\/([^/]+)$/);
     if (deleteMatch) {
+      if (!requireAuth(req, res)) return;
       await handleDeleteSession(req, res, decodeURIComponent(deleteMatch[1]));
       return;
     }
@@ -133,5 +168,8 @@ server.listen(PORT, () => {
   console.log(`Strength Companion running at http://localhost:${PORT}`);
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn("Warning: ANTHROPIC_API_KEY is not set — the session adapter will not work until it is.");
+  }
+  if (!process.env.APP_PASSWORD || !process.env.SESSION_SECRET) {
+    console.warn("Warning: APP_PASSWORD / SESSION_SECRET are not set — run node scripts/generate-password.js and add them to .env.");
   }
 });

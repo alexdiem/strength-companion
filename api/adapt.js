@@ -1,9 +1,14 @@
 import { adaptWod, isMissingKeyError, MISSING_KEY_MESSAGE } from "../lib/adapt.js";
+import { isAuthenticated } from "../lib/auth.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+  if (!isAuthenticated(req, process.env.SESSION_SECRET)) {
+    res.status(401).json({ error: "Not authenticated" });
     return;
   }
   const wod = req.body?.wod;

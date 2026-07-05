@@ -5,8 +5,13 @@ import {
   buildSession,
   SESSION_INPUT_ERROR,
 } from "../../lib/storage.js";
+import { isAuthenticated } from "../../lib/auth.js";
 
 export default async function handler(req, res) {
+  if (!isAuthenticated(req, process.env.SESSION_SECRET)) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
   if (req.method === "GET") {
     res.status(200).json(await readSessions());
     return;

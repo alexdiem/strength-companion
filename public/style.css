@@ -15,6 +15,37 @@
 /* ensure the hidden attribute wins over display rules like .row's flex */
 [hidden] { display: none !important; }
 
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.auth-form {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+.auth-form h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+.auth-form .hint { margin: 0 0 1rem; }
+.auth-form input[type="password"] {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  margin-bottom: 0.75rem;
+}
+.auth-form button.primary { width: 100%; }
+.auth-form .error { margin-top: 0.75rem; text-align: left; }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;

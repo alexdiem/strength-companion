@@ -7,6 +7,17 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <div id="auth-gate" class="auth-gate">
+    <form id="auth-form" class="auth-form">
+      <h1>Strength Companion</h1>
+      <p class="hint">Enter the password to continue.</p>
+      <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" required />
+      <button type="submit" class="primary">Unlock</button>
+      <div id="auth-error" class="error" hidden></div>
+    </form>
+  </div>
+
+  <div id="app-root" hidden>
   <header>
     <h1>Strength Companion</h1>
     <nav>
@@ -64,6 +75,7 @@
       <ul id="session-list"></ul>
     </section>
   </main>
+  </div>
 
   <script src="app.js"></script>
 </body>

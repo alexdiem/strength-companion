@@ -2,10 +2,65 @@ const PATTERNS = ["Push", "Pull", "Hinge", "Squat", "Carry", "Olympic"];
 const LOADS = ["Light", "Moderate", "Heavy"];
 const LEGACY_STORAGE_KEY = "strength-companion-sessions"; // old browser-local storage, pre server-side persistence
 
-// ---------- storage (server-side JSON file — persists across restarts and browsers) ----------
+// ---------- auth gate ----------
+
+const authGate = document.getElementById("auth-gate");
+const authForm = document.getElementById("auth-form");
+const authPassword = document.getElementById("auth-password");
+const authError = document.getElementById("auth-error");
+const appRoot = document.getElementById("app-root");
+
+function showGate() {
+  authGate.hidden = false;
+  appRoot.hidden = true;
+  authPassword.value = "";
+  authPassword.focus();
+}
+
+function hideGate() {
+  authGate.hidden = true;
+  appRoot.hidden = false;
+}
+
+// treat any 401 as "session expired or never logged in" and re-show the gate
+function handleUnauthorized(res) {
+  if (res.status === 401) {
+    showGate();
+    return true;
+  }
+  return false;
+}
+
+authForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  authError.hidden = true;
+  const submitBtn = authForm.querySelector("button[type=submit]");
+  submitBtn.disabled = true;
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: authPassword.value }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      authError.textContent = data.error || "Incorrect password.";
+      authError.hidden = false;
+      return;
+    }
+    hideGate();
+    await migrateLegacyLocalStorage();
+    render();
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// ---------- storage (server-side — persists across restarts and browsers) ----------
 
 async function fetchSessions() {
   const res = await fetch("/api/sessions");
+  if (handleUnauthorized(res)) throw new Error("Please log in again.");
   if (!res.ok) throw new Error(`Server returned ${res.status}`);
   return res.json();
 }
@@ -16,6 +71,7 @@ async function createSession(session) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(session),
   });
+  if (handleUnauthorized(res)) throw new Error("Please log in again.");
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || `Server returned ${res.status}`);
@@ -25,6 +81,7 @@ async function createSession(session) {
 
 async function deleteSession(id) {
   const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (handleUnauthorized(res)) throw new Error("Please log in again.");
   if (!res.ok && res.status !== 404) throw new Error(`Server returned ${res.status}`);
 }
 
@@ -99,6 +156,7 @@ adaptBtn.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ wod }),
     });
+    if (handleUnauthorized(res)) throw new Error("Please log in again.");
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
     adaptResult.innerHTML = renderMarkdown(data.adapted);
@@ -417,4 +475,21 @@ function renderList(sessions) {
   }
 }
 
-migrateLegacyLocalStorage().finally(render);
+async function checkAuth() {
+  try {
+    const res = await fetch("/api/sessions");
+    return res.status !== 401;
+  } catch {
+    return false;
+  }
+}
+
+(async function init() {
+  if (await checkAuth()) {
+    hideGate();
+    await migrateLegacyLocalStorage();
+    render();
+  } else {
+    showGate();
+  }
+})();
