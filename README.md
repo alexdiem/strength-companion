@@ -13,6 +13,7 @@ Every adapted session follows these rules:
 - Sets and rest periods are trimmed proportionally to fit the time budget.
 - High-load Olympic lifting progressions (heavy snatch/clean complexes) are flagged and removed.
 - Good mornings are never included — a safe hinge alternative is substituted.
+- Kipping/swinging gymnastics (kipping or butterfly pull-ups, kipping toes-to-bar, kipping HSPU, muscle-ups) are never included — the gym has no safe space for kipping, so strict versions at reduced reps are substituted.
 - Post-WOD zone 1 cardio (30–60 min bike/row/run) is removed.
 - Technical barbell lifts are capped at controlled, submaximal loads.
 - Metric units only (kg).
