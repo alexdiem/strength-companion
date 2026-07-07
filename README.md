@@ -17,6 +17,7 @@ Every adapted session follows these rules:
 - Post-WOD zone 1 cardio (30–60 min bike/row/run) is removed.
 - Technical barbell lifts are capped at controlled, submaximal loads.
 - Loads for weighted exercises are always prescribed as % of 1RM (fixed implements like wall balls and kettlebells keep a kg weight).
+- Session intensity averages out to Moderate, with variation — the main movement anchors at Moderate/Heavy while accessories sit lighter, so a session never comes out all-Light (unless the original was a deliberate light day).
 - Metric units only.
 
 ## Tracker
