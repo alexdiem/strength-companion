@@ -16,7 +16,8 @@ Every adapted session follows these rules:
 - Kipping/swinging gymnastics (kipping or butterfly pull-ups, kipping toes-to-bar, kipping HSPU, muscle-ups) are never included — the gym has no safe space for kipping, so strict versions at reduced reps are substituted.
 - Post-WOD zone 1 cardio (30–60 min bike/row/run) is removed.
 - Technical barbell lifts are capped at controlled, submaximal loads.
-- Metric units only (kg).
+- Loads for weighted exercises are always prescribed as % of 1RM (fixed implements like wall balls and kettlebells keep a kg weight).
+- Metric units only.
 
 ## Tracker
 
