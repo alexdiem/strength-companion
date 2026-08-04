@@ -10,7 +10,7 @@ A local strength training companion app with two integrated features:
 Every adapted session follows these rules:
 
 - Total session = 60 min, including a fixed 12-min warm-up.
-- Sets and rest periods are trimmed proportionally to fit the time budget.
+- Volume is trimmed to fit the time budget by cutting sets, never by cutting rest on heavy work — full recovery is what keeps a heavy set heavy. Rest is only trimmed on light/moderate accessory and conditioning work.
 - High-load Olympic lifting progressions (heavy snatch/clean complexes) are flagged and removed.
 - Good mornings are never included — a safe hinge alternative is substituted.
 - Kipping/swinging gymnastics (kipping or butterfly pull-ups, kipping toes-to-bar, kipping HSPU, muscle-ups) are never included — the gym has no safe space for kipping, so strict versions at reduced reps are substituted.
@@ -19,6 +19,7 @@ Every adapted session follows these rules:
 - Loads for weighted exercises are always prescribed as % of 1RM (fixed implements like wall balls and kettlebells keep a kg weight).
 - Session intensity averages out to Moderate, with variation — the main movement is Heavy while accessories and conditioning sit lighter, so a session never comes out all-Light (unless the original was a deliberate light day).
 - Metric units only.
+- Every session ends with a short (3–5 min) down-regulation close — breathing plus one or two easy positions for the day's main movers. It sits on top of the 60 minutes and is never counted into the warm-up or work budget.
 
 ## Tracker
 
