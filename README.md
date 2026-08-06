@@ -9,7 +9,7 @@ A local strength training companion app with two integrated features:
 
 Every adapted session follows these rules:
 
-- Total session = 60 min, including a fixed 12-min warm-up.
+- Total session = 60 min, including a fixed 12-min warm-up, which always includes a fixed oly-prep drill from the athlete's Olympic lifting coach (asymmetric stretches + empty-bar overhead squats/snatch work), reproduced exactly as prescribed and placed wherever it best fits that day's warm-up rather than forced to open it.
 - Volume is trimmed to fit the time budget by cutting sets, never by cutting rest on heavy work — full recovery is what keeps a heavy set heavy. Rest is only trimmed on light/moderate accessory and conditioning work.
 - High-load Olympic lifting progressions (heavy snatch/clean complexes) are flagged and removed.
 - Good mornings are never included — a safe hinge alternative is substituted.
