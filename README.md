@@ -11,7 +11,8 @@ Every adapted session follows these rules:
 
 - Target session length = 60 min. The warm-up is a fixed oly progression prescribed by the athlete's Olympic lifting coach (asymmetric stretches, then a barbell build through overhead squat → snatch pull (4 positions) → snatch pull (smooth) → snatch, each done in empty-bar sets of 4 that add weight while technique holds and move to the next exercise once reps must drop below 4) — its length varies session to session, so work-block time flexes to fill the rest of the ~60 minutes.
 - Volume is trimmed to fit the time budget by cutting sets, never by cutting rest on heavy work — full recovery is what keeps a heavy set heavy. Rest is only trimmed on light/moderate accessory and conditioning work.
-- No restrictions on Olympic lifting — it can be programmed as heavy as the session calls for, including as the day's main lift.
+- No restrictions on Olympic lifting except the snatch — the athlete is still learning it, so it's currently capped to technique loads only (empty bar or a light kg weight, never a working % of 1RM), regardless of what the original WOD prescribes; the clean and jerk can be programmed as heavy as the session calls for, including as the day's main lift.
+- If the WOD's own work repeats a lift the fixed warm-up progression already built through that day (overhead squat, snatch pull, snatch), its volume is trimmed down to account for the pattern already being worked, rather than programmed as a fresh block on top.
 - Good mornings are never included — a safe hinge alternative is substituted.
 - Kipping/swinging gymnastics (kipping or butterfly pull-ups, kipping toes-to-bar, kipping HSPU, muscle-ups) are never included — the gym has no safe space for kipping, so strict versions at reduced reps are substituted.
 - Post-WOD zone 1 cardio (30–60 min bike/row/run) is removed.
