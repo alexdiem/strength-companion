@@ -9,17 +9,17 @@ A local strength training companion app with two integrated features:
 
 Every adapted session follows these rules:
 
-- Total session = 60 min, including a fixed 12-min warm-up, which always includes a fixed oly-prep drill from the athlete's Olympic lifting coach (asymmetric stretches + empty-bar overhead squats/snatch work), reproduced exactly as prescribed and placed wherever it best fits that day's warm-up rather than forced to open it.
+- Target session length = 60 min. The warm-up is a fixed oly progression prescribed by the athlete's Olympic lifting coach (asymmetric stretches, then a barbell build through overhead squat → snatch pull (4 positions) → snatch pull (smooth) → snatch, each done in empty-bar sets of 4 that add weight while technique holds and move to the next exercise once reps must drop below 4) — its length varies session to session, so work-block time flexes to fill the rest of the ~60 minutes.
 - Volume is trimmed to fit the time budget by cutting sets, never by cutting rest on heavy work — full recovery is what keeps a heavy set heavy. Rest is only trimmed on light/moderate accessory and conditioning work.
-- High-load Olympic lifting progressions (heavy snatch/clean complexes) are flagged and removed.
+- No restrictions on Olympic lifting — it can be programmed as heavy as the session calls for, including as the day's main lift.
 - Good mornings are never included — a safe hinge alternative is substituted.
 - Kipping/swinging gymnastics (kipping or butterfly pull-ups, kipping toes-to-bar, kipping HSPU, muscle-ups) are never included — the gym has no safe space for kipping, so strict versions at reduced reps are substituted.
 - Post-WOD zone 1 cardio (30–60 min bike/row/run) is removed.
-- The day's main movement pattern is trained Heavy (demanding top sets, 1-2 reps in reserve — no grinding maxes); technical/Olympic lifts stay capped at controlled, submaximal loads and are never the heavy main lift.
+- The day's main movement pattern is trained Heavy (demanding top sets, 1-2 reps in reserve — no grinding maxes).
 - Loads for weighted exercises are always prescribed as % of 1RM (fixed implements like wall balls and kettlebells keep a kg weight).
 - Session intensity averages out to Moderate, with variation — the main movement is Heavy while accessories and conditioning sit lighter, so a session never comes out all-Light (unless the original was a deliberate light day).
 - Metric units only.
-- Every session ends with a short (3–5 min) down-regulation close — breathing plus one or two easy positions for the day's main movers. It sits on top of the 60 minutes and is never counted into the warm-up or work budget.
+- Every session ends with a short (3–5 min) down-regulation close — breathing plus one or two easy positions for the day's main movers. It sits on top of the session and is never counted into the warm-up or work budget.
 
 ## Tracker
 
